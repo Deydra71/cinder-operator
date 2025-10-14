@@ -1031,6 +1031,19 @@ func (r *CinderReconciler) generateServiceConfigs(
 	templateParameters["ServicePassword"] = string(ospSecret.Data[instance.Spec.PasswordSelectors.Service])
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+
+	// Check for Application Credentials
+	acSecretName := keystonev1.GetACSecretName("cinder")
+	acSecret, _, err := secret.GetSecret(ctx, h, acSecretName, instance.Namespace)
+	if err == nil && acSecret != nil {
+		// AC secret exists - add AC auth parameters
+		if acID, ok := acSecret.Data["AC_ID"]; ok {
+			templateParameters["ApplicationCredentialID"] = string(acID)
+		}
+		if acSecret, ok := acSecret.Data["AC_SECRET"]; ok {
+			templateParameters["ApplicationCredentialSecret"] = string(acSecret)
+		}
+	}
 	templateParameters["TransportURL"] = transportURLSecretData
 	templateParameters["DatabaseConnection"] = fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s?read_default_file=/etc/my.cnf",
 		databaseAccount.Spec.UserName,
