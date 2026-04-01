@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -901,7 +903,8 @@ func (r *CinderReconciler) reconcileNormal(ctx context.Context, instance *cinder
 	if instance.Spec.CinderBackups != nil {
 		var bckCondition *condition.Condition
 		waitingBkpGenerationMatch := false
-		for name, backup := range *instance.Spec.CinderBackups {
+		for _, name := range slices.Sorted(maps.Keys(*instance.Spec.CinderBackups)) {
+			backup := (*instance.Spec.CinderBackups)[name]
 			crName := fmt.Sprintf("%s-backup-%s", instance.Name, name)
 			if *backup.Replicas > 0 {
 				cinderBackup, op, err := r.backupDeploymentCreateOrUpdate(ctx, instance, crName, &backup)
@@ -956,7 +959,8 @@ func (r *CinderReconciler) reconcileNormal(ctx context.Context, instance *cinder
 	// deploy cinder-volumes
 	var volumeCondition *condition.Condition
 	waitingGenerationMatch := false
-	for name, volume := range instance.Spec.CinderVolumes {
+	for _, name := range slices.Sorted(maps.Keys(instance.Spec.CinderVolumes)) {
+		volume := instance.Spec.CinderVolumes[name]
 		cinderVolume, op, err := r.volumeDeploymentCreateOrUpdate(ctx, instance, name, volume)
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
