@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -478,7 +480,8 @@ func (r *CinderAPIReconciler) reconcileInit(
 
 	apiEndpointsV3 := make(map[string]string)
 
-	for endpointType, data := range cinderEndpoints {
+	for _, endpointType := range slices.Sorted(maps.Keys(cinderEndpoints)) {
+		data := cinderEndpoints[endpointType]
 		endpointTypeStr := string(endpointType)
 		endpointName := cinder.ServiceName + "-" + endpointTypeStr
 		svcOverride := instance.Spec.Override.Service[endpointType]
@@ -1083,8 +1086,8 @@ func (r *CinderAPIReconciler) generateServiceConfigs(
 		if err != nil {
 			return err
 		}
-		for _, data := range secret.Data {
-			customSecrets += string(data) + "\n"
+		for _, key := range slices.Sorted(maps.Keys(secret.Data)) {
+			customSecrets += string(secret.Data[key]) + "\n"
 		}
 	}
 	customData[cinder.CustomServiceConfigSecretsFileName] = customSecrets
