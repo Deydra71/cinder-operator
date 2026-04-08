@@ -440,6 +440,19 @@ func (r *CinderReconciler) reconcileDelete(ctx context.Context, instance *cinder
 	// TODO: We might need to control how the sub-services (API, Backup, Scheduler and Volumes) are
 	// deleted (when their parent Cinder CR is deleted) once we further develop their functionality
 
+	// Remove consumer finalizer from AC secrets cinder was consuming.
+	// Check both status and spec to handle the edge case where the reconciler
+	// crashed after adding the finalizer but before updating the status.
+	for _, secretName := range []string{
+		instance.Status.ApplicationCredentialSecret,
+		instance.Spec.Auth.ApplicationCredentialSecret,
+	} {
+		if err := keystonev1.RemoveACSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			secretName, cinder.ACConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// Service is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 	Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
@@ -734,6 +747,23 @@ func (r *CinderReconciler) reconcileNormal(ctx context.Context, instance *cinder
 		// so we need to return and reconcile again
 		return ctrl.Result{}, nil
 	}
+
+	// Manage AC consumer finalizer, the AC data was already read and rendered to the service config
+	if instance.Spec.Auth.ApplicationCredentialSecret != "" || instance.Status.ApplicationCredentialSecret != "" {
+		if err := keystonev1.ManageACSecretFinalizer(ctx, helper, instance.Namespace,
+			instance.Spec.Auth.ApplicationCredentialSecret,
+			instance.Status.ApplicationCredentialSecret,
+			cinder.ACConsumerFinalizer); err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ServiceConfigReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ServiceConfigReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	}
+	instance.Status.ApplicationCredentialSecret = instance.Spec.Auth.ApplicationCredentialSecret
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 

@@ -233,6 +233,9 @@ type CinderStatus struct {
 	// controller has not started processing the latest changes, and the status
 	// and its conditions are likely stale.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// ApplicationCredentialSecret - the AC secret cinder is currently consuming
+	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
 }
 
 //+kubebuilder:object:root=true
